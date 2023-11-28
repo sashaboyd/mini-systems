@@ -2,6 +2,8 @@
 
 module Main where
 
+import Prelude hiding (zipWith, Num (..), repeat)
+
 import Control.Comonad.Cofree
 import Control.Comonad
 import Control.Arrow (Kleisli (..))
@@ -22,12 +24,12 @@ pattern Single :: a -> Unique a
 pattern Single x = U (Just x)
 
 instance Alternative Unique where
-  empty = U Nothing
+  empty = Failed
   -- ‘xor’
-  U Nothing <|> U Nothing = U Nothing
-  U (Just _) <|> U (Just _) = U Nothing
-  U (Just x) <|> _ = U (Just x)
-  _ <|> U (Just y) = U (Just y)
+  Failed <|> Failed = Failed
+  Single _ <|> Single _ = Failed
+  Single x <|> _ = Single x
+  _ <|> Single y = Single y
 
 newtype PrefixTree m a =
   PT { fromPT :: Cofree (Kleisli m Char) a }
@@ -60,7 +62,33 @@ fromParser f = U (f Seq.Empty) :>: step
 
 -- The empty language, unit of ⊕
 nil :: Lang
-nil = pure (U Nothing)
+nil = pure Failed
+
+zipWith' :: Applicative f => (a -> b -> c) -> (Cofree f a -> Cofree f b -> Cofree f c)
+zipWith' f (x :< xs) (y :< ys) =
+  f x y :< (zipWith' f <$> xs <*> ys)
+
+zipWith :: (a -> b -> c) -> (Lang' a -> Lang' b -> Lang' c)
+zipWith f (L (PT t₁)) (L (PT t₂)) = L (PT (zipWith' f t₁ t₂))
+
+-- | A variant of + that fails if its variants overlap
+(⊕) :: Lang -> Lang -> Lang
+(⊕) = zipWith (<|>)
+
+infixl 6 ⊕
+
+-- | ‘Unambiguous’ concatenation of languages
+(·) :: Lang -> Lang -> Lang
+l₁ · l₂ = do
+  v₁ <- l₁
+  v₂ <- l₂
+  pure ((<>) <$> v₁ <*> v₂)
+
+infixl 7 ·
+
+-- | ‘Unambiguous’ repetition
+(*) :: Lang -> Lang
+(*) l = l ⊕ l·(l*)
 
 main :: IO ()
 main = pure ()

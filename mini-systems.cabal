@@ -20,12 +20,7 @@ executable parse
     import:           warnings
     main-is:          Main.hs
     -- other-modules:
-    other-extensions: BlockArguments
-                    , DerivingStrategies
-                    , DerivingVia
-                    , GeneralizedNewtypeDeriving
-                    , PatternSynonyms
-                    , UnicodeSyntax
+    -- other-extensions:
     build-depends:    base ^>=4.17.2.0
                     , adjunctions
                     , comonad
@@ -34,3 +29,8 @@ executable parse
                     , free
     hs-source-dirs:   app
     default-language: GHC2021
+    default-extensions: BlockArguments
+                      , DerivingStrategies
+                      , DerivingVia
+                      , PatternSynonyms
+                      , UnicodeSyntax
