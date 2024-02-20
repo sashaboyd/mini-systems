@@ -7,16 +7,12 @@ import Data.Functor.Rep
 import Control.Comonad
 import Data.Distributive
 import Control.Applicative
-import Data.Coerce
+import Data.Kind
 
+type Cotree :: Type → Type → Type
 newtype Cotree σ a =
   Cotree { fromCotree :: C.Cofree ((→) σ) a }
   deriving newtype (Functor, Representable)
-
-pattern (:<) :: a → (σ → C.Cofree ((→) σ) a) → Cotree σ a
-pattern x :< xs = Cotree (x C.:< xs)
-
-{-# COMPLETE (:<) #-}
 
 instance Comonad (Cotree σ) where
   extract = extract . fromCotree
@@ -31,12 +27,15 @@ instance Applicative (Cotree σ) where
   (<*>) = apRep
 
 -- | Also known as a trie
+type PrefixTree :: (Type → Type) → Type → Type → Type
 newtype PrefixTree f σ a =
-  PT { fromPT :: Cotree σ (f a) }
+  PT { fromPT' :: Cotree σ (f a) }
   deriving stock (Functor)
 
--- pattern (:<<) ::
--- pattern (:-<)
+pattern (:<) :: f a → (σ → C.Cofree ((→) σ) (f a)) → PrefixTree f σ a
+pattern x :< xs = PT (Cotree (x C.:< xs))
+
+{-# COMPLETE (:<) #-}
 
 instance Applicative f ⇒ Applicative (PrefixTree f σ) where
   pure = PT . pure . pure
@@ -46,21 +45,14 @@ instance Alternative f ⇒ Alternative (PrefixTree f σ) where
   empty = PT (pure empty)
   (PT t₁) <|> (PT t₂) = PT (liftA2 (<|>) t₁ t₂)
 
--- | An alternative version of 'pure'
-single :: Alternative f ⇒ a → PrefixTree f σ a
-single x = PT (pure x :< const (tabulate (const empty)))
+fromPT :: PrefixTree f σ a → C.Cofree ((→) σ) (f a)
+fromPT (PT (Cotree t)) = t
 
--- | An alternative version of '<*>'
---
--- Implements ‘convolution’ of prefix trees.
-conv :: Alternative f ⇒ (a → b → c) → PrefixTree f σ a → PrefixTree f σ b → PrefixTree f σ c
-conv f (PT (m₁ :< h₁)) pt₂@(PT (m₂ :< h₂)) =
-  PT (
-  ( f <$> m₁ <*> m₂)
-    :<
-    \x →
-      coerce
-      ( coerce (fmap (liftA2 f m₁) (h₂ x))
-        <|> conv f (coerce (h₁ x)) pt₂
-      )
-  )
+mkPT :: f a → (σ → PrefixTree f σ a) → PrefixTree f σ a
+mkPT fx f = fx :< (fromPT . f)
+
+mkMatched :: Applicative f ⇒ a → (σ → PrefixTree f σ a) → PrefixTree f σ a
+mkMatched x f = PT (Cotree (pure x C.:< (fromCotree . fromPT' . f)))
+
+failThen :: Alternative f ⇒ (σ → PrefixTree f σ a) → PrefixTree f σ a
+failThen f = PT (Cotree (empty C.:< (fromCotree . fromPT' . f)))
