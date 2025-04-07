@@ -27,6 +27,7 @@ executable parse
                     , containers
                     , distributive
                     , free
+                    , liquidhaskell ^>=0.9.10.1
                     , profunctors
     hs-source-dirs:   app
     default-language: GHC2021
