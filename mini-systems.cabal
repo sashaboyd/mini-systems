@@ -21,7 +21,7 @@ executable parse
     main-is:          Main.hs
     -- other-modules:
     -- other-extensions:
-    build-depends:    base ^>=4.20.0.0
+    build-depends:    base ^>=4.21.0.0
                     , adjunctions
                     , comonad
                     , containers
@@ -29,9 +29,11 @@ executable parse
                     , free
                     , profunctors
     hs-source-dirs:   app
-    default-language: GHC2021
+    default-language: GHC2024
     default-extensions: BlockArguments
                       , DerivingStrategies
                       , DerivingVia
+                      , FunctionalDependencies
                       , PatternSynonyms
+                      , TypeFamilies
                       , UnicodeSyntax
