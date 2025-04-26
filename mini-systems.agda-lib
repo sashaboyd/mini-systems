@@ -1,0 +1,10 @@
+name: mini-systems
+
+depend: 1lab
+include: .
+flags:
+  --cubical
+  --guardedness
+  --no-load-primitives
+  --rewriting
+  --two-level
