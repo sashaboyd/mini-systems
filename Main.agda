@@ -40,6 +40,12 @@ record Poly (F : Type ℓ → Type ℓ) : Type (lsuc ℓ) where
 
   open Functor is-Functor public
 
+record _⨰_ (P Q : Type ℓ → Type ℓ) (y : Type ℓ) : Type ℓ where
+  constructor pair
+  field
+    π₁ : P y
+    π₂ : Q y
+
 record _⊗_ (P Q : Type ℓ → Type ℓ)
   ⦃ p : Poly P ⦄ ⦃ q : Poly Q ⦄
   (y : Type ℓ)
@@ -50,6 +56,9 @@ record _⊗_ (P Q : Type ℓ → Type ℓ)
     p-positions : p.positions
     q-positions : q.positions
     directions : p.directions p-positions × q.directions q-positions → y
+
+data _◃_ (P Q : Type ℓ → Type ℓ) (y : Type ℓ) : Type ℓ where
+  composite : P (Q y) → (P ◃ Q) y
 
 Fun : Type ℓ → Type ℓ′ → Type (ℓ ⊔ ℓ′)
 Fun A B = A → B
