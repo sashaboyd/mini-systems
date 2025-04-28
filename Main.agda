@@ -15,30 +15,13 @@ record Functor (F : Type ℓ → Type ℓ) : Type (lsuc ℓ) where
 open Functor
 
 -- A normalized polynomial functor
-record SomePoly (p₀ : Type ℓ) (p♯ : p₀ → Type ℓ) (y : Type ℓ) : Type ℓ where
-  constructor some-poly
-  field
-    position : p₀
-    direction : p♯ position → y
-
-open SomePoly
+SomePoly : (p₀ : Type ℓ) (p♯ : p₀ → Type ℓ) (y : Type ℓ) → Type ℓ
+SomePoly p₀ p♯ y = Σ[ x ∈ p₀ ] (p♯ x → y)
 
 instance
   SomePolyFunctor : {p₀ : Type ℓ} {p♯ : p₀ → Type ℓ} → Functor (SomePoly p₀ p♯)
-  SomePolyFunctor .₁ f p .position = p .position
-  SomePolyFunctor .₁ f p .direction y = f (p .direction y)
-
-SomePoly≃ΣΠ
-  : {p₀ : Type ℓ} {p♯ : p₀ → Type ℓ}
-  (y : Type ℓ)
-  → SomePoly p₀ p♯ y ≃ (Σ[ a ∈ p₀ ] (p♯ a → y))
-SomePoly≃ΣΠ _ =
-  Iso→Equiv (SomePoly→ΣΠ , iso ΣΠ→SomePoly (λ _ → refl) λ _ → refl)
-  where
-    SomePoly→ΣΠ : _
-    SomePoly→ΣΠ z = z .position , z .direction
-    ΣΠ→SomePoly : _
-    ΣΠ→SomePoly z = some-poly (z .fst) (z .snd)
+  SomePolyFunctor .₁ f p .fst = p .fst
+  SomePolyFunctor .₁ f p .snd y = f (p .snd y)
 
 -- To show that a functor is polynomial, we just ask that it be isomorphic to
 -- some normalized polynomial
@@ -85,18 +68,18 @@ open _⨰_
     open _⨰_
     ⨰→Poly : _
     ⨰→Poly (pair p q) =
-      some-poly (p .position , q .position) [ p .direction , q .direction ]
+      (p .fst , q .fst) , [ p .snd , q .snd ]
     Poly→⨰ : _
-    Poly→⨰ (some-poly pos dir) =
+    Poly→⨰ (pos , dir) =
       pair
-        (some-poly (pos .fst) (λ x → dir (inl x)))
-        (some-poly (pos .snd) (λ x → dir (inr x)))
+        (pos .fst , (λ x → dir (inl x)))
+        (pos .snd , (λ x → dir (inr x)))
 
     -- Agda doesn't automatically reduce [ f ∘ inl , f ∘ inr ] → f, so we need
     -- to use []-unique explicitly
     ⨰→Poly→⨰ : (p : SomePoly (p₀ × q₀) _ y) → ⨰→Poly (Poly→⨰ p) ≡ p
-    ⨰→Poly→⨰ (some-poly pos _) =
-      ap (some-poly pos) ([]-unique refl refl)
+    ⨰→Poly→⨰ (pos , _) =
+      ap (pos ,_) ([]-unique refl refl)
 
 module _
   {P Q : Type ℓ → Type ℓ}
@@ -131,8 +114,8 @@ module _
 
   instance
     ⨰-Poly : Poly (P ⨰ Q)
-    ⨰-Poly .is-Functor .₁ f pq .π₁ = (polyP .₁) f (pq .π₁)
-    ⨰-Poly .is-Functor .₁ f pq .π₂ = (polyQ .₁) f (pq .π₂)
+    ⨰-Poly .is-Functor .₁ f pq .π₁ = polyP .₁ f (pq .π₁)
+    ⨰-Poly .is-Functor .₁ f pq .π₂ = polyQ .₁ f (pq .π₂)
     ⨰-Poly .positions = p₀ × q₀
     ⨰-Poly .directions (a , b) = p♯ a ⊎ q♯ b
     ⨰-Poly .is-Poly = ⨰≡Poly
@@ -161,11 +144,11 @@ module _
   ⊗≃Poly y = Iso→Equiv (⊗→Poly , (iso Poly→⊗ (λ _ → refl) λ _ → refl))
     where
       ⊗→Poly : _
-      ⊗→Poly pq = some-poly (pq .p-positions , pq .q-positions) (pq .directions)
+      ⊗→Poly pq = (pq .p-positions , pq .q-positions) , pq .directions
       Poly→⊗ : _
-      Poly→⊗ p .p-positions = p .position .fst
-      Poly→⊗ p .q-positions = p .position .snd
-      Poly→⊗ p .directions = p .direction
+      Poly→⊗ p .p-positions = p .fst .fst
+      Poly→⊗ p .q-positions = p .fst .snd
+      Poly→⊗ p .directions = p .snd
 
   ⊗≡Poly : (P ⊗ Q) ≡ SomePoly (p₀ × q₀) (λ (a , b) → (p♯ a × q♯ b))
   ⊗≡Poly = funext (ua ∘ ⊗≃Poly)
@@ -223,13 +206,7 @@ module _
                (λ (a , f) → Σ[ b ∈ p♯ a ] (q♯ (f b))) y
   PolyPoly≃Poly y =
     SomePoly p₀ p♯ (SomePoly q₀ q♯ y)
-    ≃⟨ SomePoly≃ΣΠ _ ⟩
-    Σ[ a ∈ p₀ ] (p♯ a → SomePoly q₀ q♯ y)
-    ≃⟨ Σ-ap-snd (λ _ → Π-cod≃ (λ _ → SomePoly≃ΣΠ _)) ⟩
-    Σ[ a ∈ p₀ ] (p♯ a → Σ[ b ∈ q₀ ] (q♯ b → y))
     ≃⟨ inner-distrib y ⟩
-    Σ[ (a , f) ∈ Σ[ a ∈ p₀ ] (p♯ a → q₀) ] ((Σ[ b ∈ p♯ a ] (q♯ (f b))) → y)
-    ≃˘⟨ SomePoly≃ΣΠ _ ⟩
     SomePoly (Σ[ a ∈ p₀ ] (p♯ a → q₀))
              (λ (a , f) → Σ[ b ∈ p♯ a ] (q♯ (f b))) y
     ≃∎
