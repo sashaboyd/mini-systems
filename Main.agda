@@ -9,10 +9,8 @@ private variable
   F G P Q P′ Q′ : Type ℴ → Type ℴ
 
 record Functor (F : Type ℓ → Type ℓ) : Type (lsuc ℓ) where
-  _₀ = F
-  field _₁ : (A → B) → F A → F B
-  infixl 100 _₀
-  infixl 100 _₁
+  ₀ = F
+  field ₁ : (A → B) → F A → F B
 
 open Functor
 
@@ -27,8 +25,8 @@ open SomePoly
 
 instance
   SomePolyFunctor : {p₀ : Type ℓ} {p♯ : p₀ → Type ℓ} → Functor (SomePoly p₀ p♯)
-  (SomePolyFunctor ₁) f p .position = p .position
-  (SomePolyFunctor ₁) f p .direction y = f (p .direction y)
+  SomePolyFunctor .₁ f p .position = p .position
+  SomePolyFunctor .₁ f p .direction y = f (p .direction y)
 
 -- To show that a functor is polynomial, we just ask that it be isomorphic to
 -- some normalized polynomial
@@ -120,8 +118,8 @@ module _
 
   instance
     ⨰-Poly : Poly (P ⨰ Q)
-    (⨰-Poly .is-Functor ₁) f pq .π₁ = (polyP ₁) f (pq .π₁)
-    (⨰-Poly .is-Functor ₁) f pq .π₂ = (polyQ ₁) f (pq .π₂)
+    ⨰-Poly .is-Functor .₁ f pq .π₁ = (polyP .₁) f (pq .π₁)
+    ⨰-Poly .is-Functor .₁ f pq .π₂ = (polyQ .₁) f (pq .π₂)
     ⨰-Poly .positions = p₀ × q₀
     ⨰-Poly .directions (a , b) = p♯ a ⊎ q♯ b
     ⨰-Poly .is-Poly = ⨰≡Poly
@@ -168,9 +166,9 @@ module _
 
   instance
     ⊗-Poly : Poly (P ⊗ Q)
-    (⊗-Poly .is-Functor ₁) f pq .p-positions = pq .p-positions
-    (⊗-Poly .is-Functor ₁) f pq .q-positions = pq .q-positions
-    (⊗-Poly .is-Functor ₁) f pq .directions y = f (pq .directions y)
+    ⊗-Poly .is-Functor .₁ f pq .p-positions = pq .p-positions
+    ⊗-Poly .is-Functor .₁ f pq .q-positions = pq .q-positions
+    ⊗-Poly .is-Functor .₁ f pq .directions y = f (pq .directions y)
     ⊗-Poly .positions = polyP .positions × polyQ .positions
     ⊗-Poly .directions pq =
       polyP .directions (fst pq) × polyQ .directions (snd pq)
