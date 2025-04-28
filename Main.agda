@@ -28,6 +28,18 @@ instance
   SomePolyFunctor .₁ f p .position = p .position
   SomePolyFunctor .₁ f p .direction y = f (p .direction y)
 
+SomePoly≃ΣΠ
+  : {p₀ : Type ℓ} {p♯ : p₀ → Type ℓ}
+  (y : Type ℓ)
+  → SomePoly p₀ p♯ y ≃ (Σ[ a ∈ p₀ ] (p♯ a → y))
+SomePoly≃ΣΠ _ =
+  Iso→Equiv (SomePoly→ΣΠ , iso ΣΠ→SomePoly (λ _ → refl) λ _ → refl)
+  where
+    SomePoly→ΣΠ : _
+    SomePoly→ΣΠ z = z .position , z .direction
+    ΣΠ→SomePoly : _
+    ΣΠ→SomePoly z = some-poly (z .fst) (z .snd)
+
 -- To show that a functor is polynomial, we just ask that it be isomorphic to
 -- some normalized polynomial
 record Poly (F : Type ℓ → Type ℓ) : Type (lsuc ℓ) where
@@ -39,6 +51,8 @@ record Poly (F : Type ℓ → Type ℓ) : Type (lsuc ℓ) where
     is-Poly : F ≡ SomePoly positions directions
 
   open Functor is-Functor public
+
+open Poly
 
 record _⨰_ (P Q : Type ℓ → Type ℓ) (y : Type ℓ) : Type ℓ where
   constructor pair
@@ -90,7 +104,6 @@ module _
   ⦃ polyP@(poly p₀ p♯ P-is-Poly) : Poly P ⦄
   ⦃ polyQ@(poly q₀ q♯ Q-is-Poly) : Poly Q ⦄
   where
-  open Poly
   open _⨰_
 
   f-P-is-Poly : ∀ (y : Type ℓ) → P y ≡ SomePoly p₀ p♯ y
@@ -135,24 +148,17 @@ record _⊗_ (P Q : Type ℓ → Type ℓ)
     q-positions : q.positions
     directions : p.directions p-positions × q.directions q-positions → y
 
-data _◃_ (P Q : Type ℓ → Type ℓ) (y : Type ℓ) : Type ℓ where
-  composite : P (Q y) → (P ◃ Q) y
-
-Fun : Type ℓ → Type ℓ′ → Type (ℓ ⊔ ℓ′)
-Fun A B = A → B
-
 module _
   {P Q : Type ℓ → Type ℓ}
   {p₀ : Type ℴ} {q₀ : Type ℴ′} {p♯ : p₀ → Type 𝒽} {q♯ : q₀ → Type 𝒽′}
   ⦃ polyP@(poly p₀ p♯ _) : Poly P ⦄ ⦃ polyQ@(poly q₀ q♯ _) : Poly Q ⦄
   where
-  open Poly
   open _⊗_
 
-  f⊗≡Poly
+  ⊗≃Poly
     : (y : Type ℓ)
-    → (P ⊗ Q) y ≡ SomePoly (p₀ × q₀) (λ (a , b) → (p♯ a × q♯ b)) y
-  f⊗≡Poly y = Iso→Path (⊗→Poly , (iso Poly→⊗ (λ _ → refl) λ _ → refl))
+    → (P ⊗ Q) y ≃ SomePoly (p₀ × q₀) (λ (a , b) → (p♯ a × q♯ b)) y
+  ⊗≃Poly y = Iso→Equiv (⊗→Poly , (iso Poly→⊗ (λ _ → refl) λ _ → refl))
     where
       ⊗→Poly : _
       ⊗→Poly pq = some-poly (pq .p-positions , pq .q-positions) (pq .directions)
@@ -162,7 +168,7 @@ module _
       Poly→⊗ p .directions = p .direction
 
   ⊗≡Poly : (P ⊗ Q) ≡ SomePoly (p₀ × q₀) (λ (a , b) → (p♯ a × q♯ b))
-  ⊗≡Poly = funext f⊗≡Poly
+  ⊗≡Poly = funext (ua ∘ ⊗≃Poly)
 
   instance
     ⊗-Poly : Poly (P ⊗ Q)
@@ -173,3 +179,97 @@ module _
     ⊗-Poly .directions pq =
       polyP .directions (fst pq) × polyQ .directions (snd pq)
     ⊗-Poly .is-Poly = ⊗≡Poly
+
+record _◃_ (P Q : Type ℓ → Type ℓ) (y : Type ℓ) : Type ℓ where
+  constructor composite
+  field
+    from-composite : P (Q y)
+
+module _
+  {P Q : Type ℓ → Type ℓ}
+  {p₀ : Type ℴ} {q₀ : Type ℴ′} {p♯ : p₀ → Type 𝒽} {q♯ : q₀ → Type 𝒽′}
+  ⦃ polyP@(poly p₀ p♯ P-is-Poly) : Poly P ⦄
+  ⦃ polyQ@(poly q₀ q♯ Q-is-Poly) : Poly Q ⦄
+  where
+  open _◃_
+
+  -- package curry and uncurry into an equivalence
+  module _ {ℓ ℓ' ℓ''} {X : Type ℓ} {Y : X → Type ℓ'} {Z : (x : X) → Y x → Type ℓ''} where
+    curry-≃ : ((p : Σ X Y) → Z (p .fst) (p .snd)) ≃ ((x : X) → (y : Y x) → Z x y)
+    curry-≃ = Iso→Equiv (curry , (iso uncurry (λ _ → refl) (λ _ → refl)))
+
+  -- given a type of the form ΣΠΣΠ, redistribute the inner ΠΣ to make the
+  -- expression have the form ΣΣΠΠ so it can be turned into the normal form for
+  -- polynomials
+  inner-distrib
+    : ∀ (y : Type ℓ)
+    → (Σ[ a ∈ p₀ ] (p♯ a → Σ[ b ∈ q₀ ] (q♯ b → y)))
+    ≃ (Σ[ (a , f) ∈ Σ[ a ∈ p₀ ] (p♯ a → q₀) ] ((Σ[ b ∈ p♯ a ] (q♯ (f b))) → y))
+  inner-distrib y =
+    (Σ[ a ∈ p₀ ] (p♯ a → Σ[ b ∈ q₀ ] (q♯ b → y)))
+    ≃⟨ Σ-ap-snd (λ _ → Σ-Π-distrib) ⟩ -- distribute the inner ΠΣ to ΣΠ
+    Σ[ a ∈ p₀ ] (Σ[ f ∈ (p♯ a → q₀) ] ((b : p♯ a) → q♯ (f b) → y))
+    ≃⟨ Σ-assoc ⟩                      -- reassociate the outer Σs
+    (Σ[ (a , f) ∈ Σ[ a ∈ p₀ ] (p♯ a → q₀) ] ((b : p♯ a) → (c : q♯ (f b)) → y))
+    ≃˘⟨ Σ-ap-snd (λ _ → curry-≃) ⟩    -- uncurry the inner Πs
+    (Σ[ (a , f) ∈ Σ[ a ∈ p₀ ] (p♯ a → q₀) ] ((Σ[ b ∈ p♯ a ] (q♯ (f b))) → y))
+    ≃∎
+
+  -- normalize a polynomial of polynomials into a single polynomial
+  PolyPoly≃Poly
+    : (y : Type ℓ)
+    → SomePoly p₀ p♯ (SomePoly q₀ q♯ y)
+    ≃ SomePoly (Σ[ a ∈ p₀ ] (p♯ a → q₀))
+               (λ (a , f) → Σ[ b ∈ p♯ a ] (q♯ (f b))) y
+  PolyPoly≃Poly y =
+    SomePoly p₀ p♯ (SomePoly q₀ q♯ y)
+    ≃⟨ SomePoly≃ΣΠ _ ⟩
+    Σ[ a ∈ p₀ ] (p♯ a → SomePoly q₀ q♯ y)
+    ≃⟨ Σ-ap-snd (λ _ → Π-cod≃ (λ _ → SomePoly≃ΣΠ _)) ⟩
+    Σ[ a ∈ p₀ ] (p♯ a → Σ[ b ∈ q₀ ] (q♯ b → y))
+    ≃⟨ inner-distrib y ⟩
+    Σ[ (a , f) ∈ Σ[ a ∈ p₀ ] (p♯ a → q₀) ] ((Σ[ b ∈ p♯ a ] (q♯ (f b))) → y)
+    ≃˘⟨ SomePoly≃ΣΠ _ ⟩
+    SomePoly (Σ[ a ∈ p₀ ] (p♯ a → q₀))
+             (λ (a , f) → Σ[ b ∈ p♯ a ] (q♯ (f b))) y
+    ≃∎
+
+  P◃Qy≃PQy : (y : Type ℓ) → (P ◃ Q) y ≃ P (Q y)
+  P◃Qy≃PQy y =
+    Iso→Equiv ( from-composite , (iso composite (λ _ → refl) (λ _ → refl)))
+
+  ◃≃Poly
+    : (y : Type ℓ)
+    → (P ◃ Q) y
+    ≃ SomePoly (Σ[ a ∈ p₀ ] (p♯ a → q₀))
+               (λ (a , f) → Σ[ b ∈ p♯ a ] (q♯ (f b))) y
+  ◃≃Poly y =
+    (P ◃ Q) y
+    ≃⟨ P◃Qy≃PQy y ⟩
+    P (Q y)
+    ≃⟨ P≃Poly (Q y) ⟩
+    SomePoly p₀ p♯ (Q y)
+    ≃⟨ Q≃Poly ⟩
+    SomePoly p₀ p♯ (SomePoly q₀ q♯ y)
+    ≃⟨ PolyPoly≃Poly y ⟩
+    SomePoly (Σ[ a ∈ p₀ ] (p♯ a → q₀))
+             (λ (a , f) → Σ[ b ∈ p♯ a ] (q♯ (f b))) y
+    ≃∎
+    where
+      P≃Poly : (x : Type ℓ) → _
+      P≃Poly x = path→equiv (happly P-is-Poly x)
+      Q≃Poly : _
+      Q≃Poly = path→equiv (ap (SomePoly p₀ p♯) (happly Q-is-Poly y))
+
+  ◃≡Poly
+    : P ◃ Q
+    ≡ SomePoly (Σ[ a ∈ p₀ ] (p♯ a → q₀))
+               (λ (a , f) → Σ[ b ∈ p♯ a ] (q♯ (f b)))
+  ◃≡Poly = funext (ua ∘ ◃≃Poly)
+
+  instance
+    ◃-Poly : Poly (P ◃ Q)
+    ◃-Poly .is-Functor .₁ f = composite ∘ polyP .₁ (polyQ .₁ f) ∘ from-composite
+    ◃-Poly .positions = Σ[ a ∈ p₀ ] (p♯ a → q₀)
+    ◃-Poly .directions (a , f) = Σ[ b ∈ p♯ a ] (q♯ (f b))
+    ◃-Poly .is-Poly = ◃≡Poly
