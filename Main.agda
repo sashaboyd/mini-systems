@@ -250,3 +250,44 @@ module _
     ◃-Poly .positions = Σ[ a ∈ p₀ ] (p♯ a → q₀)
     ◃-Poly .directions (a , f) = Σ[ b ∈ p♯ a ] (q♯ (f b))
     ◃-Poly .is-Poly = ◃≡Poly
+
+record Comonad (P : Type ℓ → Type ℓ) : Type (lsuc ℓ) where
+  field
+    ⦃ P-Functor ⦄ : Functor P
+    ε : ∀ {A : Type ℓ} → P A → A
+    δ : ∀ {A : Type ℓ} → P A → P (P A)
+
+  open Functor P-Functor public
+
+record LeftComodule {P : Type ℓ → Type ℓ} (𝒞 : Comonad P)
+  (m : Type ℓ → Type ℓ) : Type (lsuc ℓ) where
+  open Comonad 𝒞 renaming (₀ to C₀ ; ₁ to C₁)
+  field
+    ⦃ M ⦄ : Functor m
+    ƛ : ∀ {A : Type ℓ} → m A → C₀ (m A)
+    ƛ-respects-ε : ∀ {x : m A} → ε (ƛ x) ≡ x
+    ƛ-respects-δ : ∀ {x : m A} → C₁ ƛ (ƛ x) ≡ δ (ƛ x)
+
+record RightComodule {P : Type ℓ → Type ℓ} (𝒞 : Comonad P)
+  (m : Type ℓ → Type ℓ) : Type (lsuc ℓ) where
+  open Comonad 𝒞 renaming (₀ to C₀ ; ₁ to C₁)
+  field
+    ⦃ M ⦄ : Functor m
+    ρ : ∀ {A : Type ℓ} → m A → m (C₀ A)
+    ρ-respects-ε : ∀ {x : m A} → M .₁ ε (ρ x) ≡ x
+    ρ-respects-δ : ∀ {x : m A} → ρ (ρ x) ≡ M .₁ δ (ρ x)
+
+-- A bicomodule corresponds to a parametric right adjoint functor 𝒟 → 𝒞
+record Bicomodule {P Q : Type ℓ → Type ℓ} (𝒞 : Comonad P) (𝒟 : Comonad Q)
+  (m : Type ℓ → Type ℓ) : Type (lsuc ℓ) where
+  private module C = Comonad 𝒞
+  private module D = Comonad 𝒟
+  field
+    is-LCM : LeftComodule 𝒞 m
+    is-RCM : RightComodule 𝒟 m
+
+  open LeftComodule is-LCM public
+  open RightComodule is-RCM public
+
+  field
+    coactions-commute : ∀ {x : m A} → C.₁ ρ (ƛ x) ≡ ƛ (ρ x)
