@@ -8,21 +8,28 @@ private variable
   A A′ B B′ X Y : Type ℴ
   P Q P′ Q′ : Type ℴ → Type ℴ
 
-record Functor (F : Type ℓ → Type ℓ) : Type (lsuc ℓ) where
+record Endofunctor (F : Type ℓ → Type ℓ) : Type (lsuc ℓ) where
   ob-action = F
   field ₁ : ∀ {A B : Type ℓ} → (A → B) → F A → F B
 
-open Functor
+open Endofunctor
 
 const : A → X → A
 const a _ = a
 
-κ : ∀ (A : Type ℓ) → Functor (const A)
+Id : Endofunctor (id {A = Type ℓ})
+Id .₁ f a = f a
+
+κ : ∀ (A : Type ℓ) → Endofunctor (const A)
 κ _ .₁ _ a = a
+
+_○_ : {F G : Type ℓ → Type ℓ}
+  → Endofunctor F → Endofunctor G → Endofunctor (F ∘ G)
+(F ○ G) .₁ z = F .₁ (G .₁ z)
 
 record _⇒_
   {F₀ G₀ : Type ℓ → Type ℓ}
-  (F : Functor F₀) (G : Functor G₀)
+  (F : Endofunctor F₀) (G : Endofunctor G₀)
   : Type (lsuc ℓ) where
   field
     trans : ∀ (A : Type ℓ) → F₀ A → G₀ A
@@ -42,14 +49,14 @@ constTrans f .is-natural g c = refl
 SomePoly : (p1 : Type ℓ) (p[_] : p1 → Type ℓ) (y : Type ℓ) → Type ℓ
 SomePoly p1 p[_] y = Σ[ x ∈ p1 ] (p[ x ] → y)
 
-PolyF : (p1 : Type ℓ) (p[_] : p1 → Type ℓ) → Functor (SomePoly p1 p[_])
+PolyF : (p1 : Type ℓ) (p[_] : p1 → Type ℓ) → Endofunctor (SomePoly p1 p[_])
 PolyF _ _ .₁ f p .fst = p .fst
 PolyF _ _ .₁ f p .snd y = f (p .snd y)
 
 instance
   PolyFunctor
     : {p1 : Type ℓ} {p[_] : p1 → Type ℓ}
-    → Functor (SomePoly {ℓ = ℓ} p1 p[_])
+    → Endofunctor (SomePoly {ℓ = ℓ} p1 p[_])
   PolyFunctor {p1 = p1} {p[_] = p[_]} = PolyF p1 p[_]
 
 Lens
@@ -66,12 +73,12 @@ Lens _ _ .is-natural {A = A} _ _ = refl
 record Poly (F : Type ℓ → Type ℓ) : Type (lsuc ℓ) where
   constructor poly
   field
-    ⦃ is-Functor ⦄ : Functor F
+    ⦃ is-Functor ⦄ : Endofunctor F
     positions : Type ℓ
     directions : positions → Type ℓ
     is-Poly : F ≡ SomePoly positions directions
 
-  open Functor is-Functor public
+  open Endofunctor is-Functor public
 
 open Poly
 
@@ -94,6 +101,12 @@ open _⨰_
 ⨰-ap : ∀ y → (P y ≃ P′ y) → (Q y ≃ Q′ y) → (P ⨰ Q) y ≃ (P′ ⨰ Q′) y
 ⨰-ap y P≃P′ Q≃Q′ =
   ⨰≃× y ∙e Σ-ap P≃P′ (λ _ → Q≃Q′) ∙e ((⨰≃× y) e⁻¹)
+
+⨰-Endofunctor
+  : {F G : Type ℓ → Type ℓ}
+  → Endofunctor F → Endofunctor G → Endofunctor (F ⨰ G)
+⨰-Endofunctor F G .₁ f (pair x y) =
+  pair (F .₁ f x) (G .₁ f y)
 
 ⨰-Poly-distrib
   : ∀ (p1 q1 : Type ℓ) (p[_] : p1 → Type ℓ) (q[_] : q1 → Type ℓ) (y : Type ℓ)
@@ -152,8 +165,9 @@ module _
 
   instance
     ⨰-Poly : Poly (P ⨰ Q)
-    ⨰-Poly .is-Functor .₁ f pq .π₁ = polyP .₁ f (pq .π₁)
-    ⨰-Poly .is-Functor .₁ f pq .π₂ = polyQ .₁ f (pq .π₂)
+    ⨰-Poly .is-Functor =
+      ⨰-Endofunctor (polyP .is-Functor)
+                    (polyQ .is-Functor)
     ⨰-Poly .positions = p1 × q1
     ⨰-Poly .directions (a , b) = p[ a ] ⊎ q[ b ]
     ⨰-Poly .is-Poly = ⨰≡Poly
@@ -162,6 +176,7 @@ record _⊗_ (P Q : Type ℓ → Type ℓ)
   ⦃ p : Poly P ⦄ ⦃ q : Poly Q ⦄
   (y : Type ℓ)
   : Type ℓ where
+  constructor mk-⊗
   private module p = Poly p
   private module q = Poly q
   field
@@ -292,17 +307,24 @@ module _
 
 record Comonad (P : Type ℓ → Type ℓ) : Type (lsuc ℓ) where
   field
-    ⦃ P-Functor ⦄ : Functor P
+    ⦃ ComonadFunctor ⦄ : Endofunctor P
     ε : ∀ {A : Type ℓ} → P A → A
     δ : ∀ {A : Type ℓ} → P A → P (P A)
 
-  open Functor P-Functor public
+  open Endofunctor ComonadFunctor public
 
+record Category (𝔠 : Type ℓ → Type ℓ) : Type (lsuc ℓ) where
+  field
+    ⦃ CatComonad ⦄ : Comonad 𝔠
+    ⦃ CatPoly ⦄ : Poly 𝔠
+
+  open Comonad CatComonad public
+  open Poly CatPoly using (positions ; directions) public
 record LeftComodule {P : Type ℓ → Type ℓ} (𝒞 : Comonad P)
   (m : Type ℓ → Type ℓ) : Type (lsuc ℓ) where
   open Comonad 𝒞 renaming (ob-action to C₀ ; ₁ to C₁)
   field
-    ⦃ M ⦄ : Functor m
+    ⦃ M ⦄ : Endofunctor m
     ƛ : ∀ {A : Type ℓ} → m A → C₀ (m A)
     ƛ-respects-ε : ∀ {x : m A} → ε (ƛ x) ≡ x
     ƛ-respects-δ : ∀ {x : m A} → C₁ ƛ (ƛ x) ≡ δ (ƛ x)
@@ -311,22 +333,22 @@ record RightComodule {P : Type ℓ → Type ℓ} (𝒞 : Comonad P)
   (m : Type ℓ → Type ℓ) : Type (lsuc ℓ) where
   open Comonad 𝒞 renaming (ob-action to C₀ ; ₁ to C₁)
   field
-    ⦃ M ⦄ : Functor m
+    ⦃ M ⦄ : Endofunctor m
     ρ : ∀ {A : Type ℓ} → m A → m (C₀ A)
     ρ-respects-ε : ∀ {x : m A} → M .₁ ε (ρ x) ≡ x
     ρ-respects-δ : ∀ {x : m A} → ρ (ρ x) ≡ M .₁ δ (ρ x)
 
 -- A bicomodule corresponds to a parametric right adjoint functor M : 𝒟 → 𝒞
-record Bicomodule {P Q : Type ℓ → Type ℓ} (𝒞 : Comonad P) (𝒟 : Comonad Q)
+record _⇾_ {P Q : Type ℓ → Type ℓ} (𝒞 : Comonad P) (𝒟 : Comonad Q)
   (m : Type ℓ → Type ℓ) : Type (lsuc ℓ) where
   private module C = Comonad 𝒞
   private module D = Comonad 𝒟
   field
-    is-LCM : LeftComodule 𝒞 m
-    is-RCM : RightComodule 𝒟 m
+    is-LCM : LeftComodule 𝒟 m
+    is-RCM : RightComodule 𝒞 m
 
   open LeftComodule is-LCM public
   open RightComodule is-RCM public
 
   field
-    coactions-commute : ∀ {x : m A} → C.₁ ρ (ƛ x) ≡ ƛ (ρ x)
+    coactions-commute : ∀ {x : m A} → D.₁ ρ (ƛ x) ≡ ƛ (ρ x)
