@@ -82,6 +82,16 @@ record Poly (F : Type ℓ → Type ℓ) : Type (lsuc ℓ) where
 
 open Poly
 
+instance
+  yₚ : Poly (id {A = Type ℓ})
+  yₚ .is-Functor = Id
+  yₚ {ℓ = ℓ} .positions = Lift ℓ ⊤
+  yₚ {ℓ = ℓ} .directions _ = Lift ℓ ⊤
+  yₚ .is-Poly =
+    funext (λ x → Iso→Path ((λ y → lift tt , (λ tt → y))
+           , (iso (λ (t , f) → f t)
+             (λ _ → refl) (λ _ → refl))))
+
 record _⨰_ (P Q : Type ℓ → Type ℓ) (y : Type ℓ) : Type ℓ where
   constructor pair
   field
@@ -132,6 +142,9 @@ open _⨰_
     ⨰→Poly→⨰ (pos , _) =
       ap (pos ,_) ([]-unique refl refl)
 
+fun≡→equiv : P ≡ Q → ∀ A → P A ≃ Q A
+fun≡→equiv path = path→equiv ∘ happly path
+
 module _
   {P Q : Type ℓ → Type ℓ}
   {p1 : Type ℴ} {q1 : Type ℴ′} {p[_] : p1 → Type 𝒽} {q[_] : q1 → Type 𝒽}
@@ -140,25 +153,20 @@ module _
   where
   open _⨰_
 
-  f-P-is-Poly : ∀ (y : Type ℓ) → P y ≡ SomePoly p1 p[_] y
-  f-P-is-Poly = happly P-is-Poly
-
-  f-Q-is-Poly : ∀ (y : Type ℓ) → Q y ≡ SomePoly q1 q[_] y
-  f-Q-is-Poly = happly Q-is-Poly
+  private
+    P≃Poly : ∀ (y : Type ℓ) → P y ≃ SomePoly p1 p[_] y
+    P≃Poly y = path→equiv (happly P-is-Poly y)
+    Q≃Poly : ∀ (y : Type ℓ) → Q y ≃ SomePoly q1 q[_] y
+    Q≃Poly y = path→equiv (happly Q-is-Poly y)
 
   ⨰≃Poly
     : (y : Type ℓ)
     → (P ⨰ Q) y ≃ SomePoly (p1 × q1) (λ (a , b) → (p[ a ] ⊎ q[ b ])) y
   ⨰≃Poly y =
-    (P ⨰ Q) y                               ≃⟨ ⨰-ap y P≃Poly Q≃Poly ⟩
+    (P ⨰ Q) y                               ≃⟨ ⨰-ap y (P≃Poly y) (Q≃Poly y) ⟩
     (SomePoly p1 p[_] ⨰ SomePoly q1 q[_]) y ≃⟨ ⨰-Poly-distrib p1 q1 p[_] q[_] y ⟩
     SomePoly (p1 × q1)
       (λ (a , b) → p[ a ] ⊎ q[ b ]) y       ≃∎
-    where
-      P≃Poly : _
-      P≃Poly = path→equiv (happly P-is-Poly y)
-      Q≃Poly : _
-      Q≃Poly = path→equiv (happly Q-is-Poly y)
 
   ⨰≡Poly : (P ⨰ Q) ≡ SomePoly (p1 × q1) (λ (a , b) → (p[ a ] ⊎ q[ b ]))
   ⨰≡Poly = funext (ua ∘ ⨰≃Poly)
@@ -184,10 +192,49 @@ record _⊗_ (P Q : Type ℓ → Type ℓ)
     q-positions : q.positions
     directions : p.directions p-positions × q.directions q-positions → y
 
+yₚ⊗yₚ≃yₚ : ∀ (Y : Type ℓ) → (id ⊗ id) Y ≃ Y
+yₚ⊗yₚ≃yₚ _ =
+  Iso→Equiv
+  ( (λ x → x ._⊗_.directions (lift tt , lift tt))
+  , iso (λ x → mk-⊗ (lift tt) (lift tt) (λ tt → x))
+        (λ _ → refl) (λ _ → refl))
+
+⊗-map₂
+  : ⦃ _ : Poly P ⦄ ⦃ _ : Poly P′ ⦄
+    ⦃ _ : Poly Q ⦄ ⦃ _ : Poly Q′ ⦄
+  → (∀ {X : Type ℓ} → P X → P′ X)
+  → (∀ {X : Type ℓ} → Q X → Q′ X)
+  → (P ⊗ Q) Y → (P′ ⊗ Q′) Y
+⊗-map₂
+  ⦃ polyP ⦄
+  ⦃ polyP′ ⦄
+  ⦃ polyQ ⦄
+  ⦃ polyQ′ ⦄
+  f g (mk-⊗ p1a q1b h) =
+  mk-⊗ (newP .fst) (newQ .fst) (uncurry (flip (newQ .snd)))
+  where
+        fₚ : ∀ {X} → SomePoly _ _ X → SomePoly _ _ X
+        fₚ px =
+          transport (happly (polyP′ .is-Poly) _)
+            (f (transport (happly (sym ( polyP .is-Poly)) _) px))
+        gₚ : ∀ {X} → SomePoly _ _ X → SomePoly _ _ X
+        gₚ qx =
+          transport (happly (polyQ′ .is-Poly) _)
+            (g (transport (happly (sym (polyQ .is-Poly)) _) qx))
+
+        newP : _
+        newP =
+          fₚ (p1a , curry h)
+        newQ : _
+        newQ =
+          gₚ (q1b , flip (newP .snd))
+
 module _
   {P Q : Type ℓ → Type ℓ}
-  {p1 : Type ℴ} {q1 : Type ℴ′} {p[_] : p1 → Type 𝒽} {q[_] : q1 → Type 𝒽′}
-  ⦃ polyP@(poly p1 p[_] _) : Poly P ⦄ ⦃ polyQ@(poly q1 q[_] _) : Poly Q ⦄
+  {p1 : Type ℴ} {q1 : Type ℴ′}
+  {p[_] : p1 → Type 𝒽} {q[_] : q1 → Type 𝒽′}
+  ⦃ polyP@(poly p1 p[_] P-is-Poly) : Poly P ⦄
+  ⦃ polyQ@(poly q1 q[_] Q-is-Poly) : Poly Q ⦄
   where
   open _⊗_
 
@@ -228,6 +275,12 @@ module _
   ⦃ polyQ@(poly q1 q[_] Q-is-Poly) : Poly Q ⦄
   where
   open _◃_
+
+  private
+    P≃Poly : ∀ (y : Type ℓ) → P y ≃ SomePoly p1 p[_] y
+    P≃Poly y = path→equiv (happly P-is-Poly y)
+    Q≃Poly : ∀ (y : Type ℓ) → Q y ≃ SomePoly q1 q[_] y
+    Q≃Poly y = path→equiv (happly Q-is-Poly y)
 
   -- package curry and uncurry into an equivalence
   module _ {ℓ ℓ' ℓ''} {X : Type ℓ} {Y : X → Type ℓ'} {Z : (x : X) → Y x → Type ℓ''} where
@@ -280,17 +333,15 @@ module _
     P (Q y)
     ≃⟨ P≃Poly (Q y) ⟩
     SomePoly p1 p[_] (Q y)
-    ≃⟨ Q≃Poly ⟩
+    ≃⟨ Q≃Poly-inner ⟩
     SomePoly p1 p[_] (SomePoly q1 q[_] y)
     ≃⟨ PolyPoly≃Poly y ⟩
     SomePoly (Σ[ a ∈ p1 ] (p[ a ] → q1))
              (λ (a , f) → Σ[ b ∈ p[ a ] ] q[ f b ]) y
     ≃∎
     where
-      P≃Poly : (x : Type ℓ) → _
-      P≃Poly x = path→equiv (happly P-is-Poly x)
-      Q≃Poly : _
-      Q≃Poly = path→equiv (ap (SomePoly p1 p[_]) (happly Q-is-Poly y))
+      Q≃Poly-inner : _
+      Q≃Poly-inner = path→equiv (ap (SomePoly p1 p[_]) (happly Q-is-Poly y))
 
   ◃≡Poly
     : P ◃ Q
@@ -305,6 +356,31 @@ module _
     ◃-Poly .directions (a , f) = Σ[ b ∈ p[ a ] ] q[ f b ]
     ◃-Poly .is-Poly = ◃≡Poly
 
+module _
+  {P Q P′ Q′ : Type ℓ → Type ℓ}
+  {p1 : Type ℓ}
+  {q1 : Type ℓ}
+  {p′1 : Type ℓ}
+  {q′1 : Type ℓ}
+  {p[_] : p1 → Type ℓ}
+  {p′[_] : p′1 → Type ℓ}
+  {q[_] : q1 → Type ℓ}
+  {q′[_] : q′1 → Type ℓ}
+  {α β : Type ℓ}
+  ⦃ polyP@(poly p1 p[_] P-is-Poly) : Poly P ⦄
+  ⦃ polyP′@(poly p′1 p′[_] P′-is-Poly) : Poly P′ ⦄
+  ⦃ polyQ@(poly q1 q[_] Q-is-Poly) : Poly Q ⦄
+  ⦃ polyQ′@(poly q′1 q′[_] Q′-is-Poly) : Poly Q′ ⦄
+  {Y : Type _}
+  where
+    -- also, ◃ has a duoidal relationship with ⊗
+    -- sigh, more metavariable issues. I'm not sure I can resolve this without serious refactoring, since it seems like it can't figure out the values of the polynomial for the ◃ instance
+    ⊗-◃-duoid : ((P ◃ P′) ⊗ (Q ◃ Q′)) Y → ((P ⊗ Q) ◃ (P′ ⊗ Q′)) Y
+    ⊗-◃-duoid (mk-⊗ (p1x , f) (q1x , g) h) ._◃_.from-composite =
+      mk-⊗ p1x q1x λ (x₁ , x₂) →
+        mk-⊗ (f x₁) (g x₂) λ (u , v) →
+          h ((x₁ , u) , (x₂ , v))
+
 record Comonad (P : Type ℓ → Type ℓ) : Type (lsuc ℓ) where
   field
     ⦃ ComonadFunctor ⦄ : Endofunctor P
@@ -318,8 +394,37 @@ record Category (𝔠 : Type ℓ → Type ℓ) : Type (lsuc ℓ) where
     ⦃ CatComonad ⦄ : Comonad 𝔠
     ⦃ CatPoly ⦄ : Poly 𝔠
 
-  open Comonad CatComonad public
-  open Poly CatPoly using (positions ; directions) public
+  open Comonad CatComonad hiding (ob-action ; ₁) public
+  open Poly CatPoly
+    renaming ( positions to Ob
+             ; directions to [_,-]
+             )
+    public
+
+module _
+  (𝔠 𝔡 : Type ℓ → Type ℓ)
+  ⦃ 𝒞 : Category 𝔠 ⦄
+  ⦃ 𝒟 : Category 𝔡 ⦄
+  where
+  private module 𝒞 = Category 𝒞
+  private module 𝒟 = Category 𝒟
+  open Category
+  open Comonad
+  open Poly
+  open _⊗_
+
+  ⊗-δ : (𝔠 ⊗ 𝔡) Y → (𝔠 ⊗ 𝔡) ((𝔠 ⊗ 𝔡) Y)
+  ⊗-δ pq = _◃_.from-composite
+    (⊗-◃-duoid (⊗-map₂ (composite ∘ 𝒞.δ) (composite ∘ 𝒟.δ) pq))
+
+  ProductCategory : Category (𝔠 ⊗ 𝔡)
+  ProductCategory .CatComonad .ComonadFunctor .₁ f (mk-⊗ p1 q1 dirs) =
+    mk-⊗ p1 q1 (f ∘ dirs)
+  ProductCategory .CatComonad .ε {A = A} pq =
+    yₚ⊗yₚ≃yₚ A .fst (⊗-map₂ 𝒞.ε 𝒟.ε pq)
+  ProductCategory .CatComonad .δ = ⊗-δ
+  ProductCategory .CatPoly = ⊗-Poly
+
 record LeftComodule {P : Type ℓ → Type ℓ} (𝒞 : Comonad P)
   (m : Type ℓ → Type ℓ) : Type (lsuc ℓ) where
   open Comonad 𝒞 renaming (ob-action to C₀ ; ₁ to C₁)
