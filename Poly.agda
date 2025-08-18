@@ -55,9 +55,10 @@ module ₛ where
     Sets-cc .has-exp A B .ev (f , x) = f x
     Sets-cc .has-exp A B .has-is-exp .ƛ f cxt a = f (cxt , a)
     Sets-cc .has-exp A B .has-is-exp .commutes _ = refl
-    Sets-cc .has-exp A B .has-is-exp .unique m' x = {!!}
+    Sets-cc .has-exp A B .has-is-exp .unique _ = ap curry
 
-  open Cartesian-closed (slices-cc 𝟙ₛ) renaming (has-exp to _^_)
+  -- open Cartesian-closed (slices-cc 𝟙ₛ) renaming (has-exp to _^_)
+  open Cartesian-closed (Sets-cc)
 
   Sets[_,_] : Set ℓ → Set ℓ → Set ℓ
   Sets[_,_] A B = el (A ⇾ B) (Hom-set A B)
@@ -65,23 +66,8 @@ module ₛ where
   Σ1A≃A : ∀{ℓ : Level} {x : Type ℓ} → (𝟙ₜ × x) ≃ x
   Σ1A≃A = Σ-contr-eqv (contr (lift tt) (λ _ → refl))
 
-  ident-on-P : (T T′ : Type ℓ) (x y : T) → (P : T → T′) → (x ≡ y) → (P x ≡ P y)
-  ident-on-P _ _ x y P = ap P
-
   ≅-ap : (F : Set ℓ → Set ℓ) → (A ≅ B) → (F A ≅ F B)
-  ≅-ap {A = A} F s = J-iso (λ X _ → F A ≅ F X) id-iso s
-
-  ≅-dom : (A ≅ A′) → Sets[ A , B ] ≅ Sets[ A′ , B ]
-  ≅-dom {B = B} s = ≅-ap (λ X → el (X ⇾ B) (Hom-set X B)) s
-
-  ≅-cod : (B ≅ B′) → Sets[ A , B ] ≅ Sets[ A , B′ ]
-  ≅-cod {A = A} s = ≅-ap (λ X → el (A ⇾ X) (Hom-set A X)) s
-
-  ≅Sets[_,_] : (A ≅ A′) → (B ≅ B′) → Sets[ A , B ] ≅ Sets[ A′ , B′ ]
-  ≅Sets[_,_] {A = A} {B′ = B′} s t =
-    ≅-ap (λ X → el (X ⇾ B′) (Hom-set X B′)) s
-    ∘Iso
-    ≅-ap (λ X → el (A ⇾ X) (Hom-set A X)) t
+  ≅-ap {A = A} F = J-iso (λ X _ → F A ≅ F X) id-iso
 
   -- package curry and uncurry into an isomorphism
   module _ {ℓ ℓ' ℓ''} {X : Type ℓ} {Y : X → Type ℓ'} {Z : (x : X) → Y x → Type ℓ''} where
@@ -94,38 +80,7 @@ module ₛ where
     record { to = curry ; from = uncurry
            ; inverses = record { invl = refl ; invr = refl } }
 
-  -- stupid-iso
-  --   : {A B : Set ℓ}
-  --   → Sets[ el! (Σ[ _ ∈ 𝟙ₜ ] ∣ A ∣) , el! (Σ[ _ ∈ 𝟙ₜ ] ∣ B ∣) ] ≅ Sets[ A , B ]
-  -- stupid-iso {A = A} {B = B} = -- ≅Sets[ Σ1A≅A A , Σ1A≅A B ]
-  --   ≅-ap (Sets[_, B ]) Σ1A≅A
-  --   ∘Iso
-  --   ≅-ap (Sets[ el! (𝟙ₜ × ∣ A ∣) ,_]) Σ1A≅A {A = B}
-
-  -- dumb-iso
-  --   : (A B C : Set ℓ)
-  --   → Sets[ el! (𝟙ₜ × ∣ A ∣) , Sets[ B , C ] ] ≅ Sets[ el! (∣ A ∣ × ∣ B ∣) , C ]
-  -- dumb-iso A B C =
-  --   ≅-ap (Sets[_, Sets[ B , C ] ]) Σ1A≅A
-  --   ∙Iso
-  --   curry-≅ A B C Iso⁻¹
-
-  -- TODO: I'm gonna just have to figure out where × and stuff are defined for the actual category of sets, and make use of that
-  -- obvious-iso
-  --   : (A B C : Set ℓ)
-  --   → Sets[ el! (𝟙ₜ × ∣ A ∣) , el! (𝟙ₜ × ∣ Sets[ B , C ] ∣) ] ≅ Sets[ el! (∣ A ∣ × ∣ B ∣) , C ]
-  -- obvious-iso A B C =
-  --   ≅-ap (Sets[_, el (Σ ⌞ 𝟙ₜ ⌟ (λ _ → ∣ Sets[ B , C ] ∣)) _ ]) (Σ1A≅A A)
-  --   ₛ.∙Iso
-  --   ≅-ap (Sets[ A ,_]) (Σ1A≅A Sets[ B , C ])
-  --   ₛ.∙Iso
-  --   curry-≅ A B C ₛ.Iso⁻¹
-
-
 module F where
-
-  postulate
-    nonsense : ⊥
 
   open ₛ using (_⇾_)
   open import Cat.Functor.Constant
@@ -156,32 +111,100 @@ module F where
     open import Cat.Univalent
 
     open make-natural-iso
-    lemma :
-      ∀ F G φ → PathP (λ i → Hom (F∘-idl {F = F} i) (F∘-idl {F = G} i)) (id ◆ φ) φ
-    lemma F G φ =
-      Nat-pathp F∘-idl F∘-idl λ _ → refl
+    open _=>_
 
-    lemma2 :
-      ∀ F G φ → PathP (λ i → Hom (F∘-idr {F = F} i) (F∘-idr {F = G} i)) (φ ◆ id) φ
-    lemma2 F G φ =
-      -- I'm really not sure what to do here, but φ is being applied on the outside, while the inside is changing trivially
-      Nat-pathp F∘-idr F∘-idr (λ A → {!!})
+    -- TODO: we're gonna need naturality here because ◆ has a particular ordering. Probably best to expand the definitions so that I can see exactly what ordering there is and what needs to be reordered
 
-    ◃-monoidal : Monoidal-category (PSh ℓ (Sets ℓ ^op))
+    -- lemma2 : ∀ (F F′ G G′ H H′ : Functor (Sets ℓ) (Sets ℓ)) (φ : F => F′) (γ : G => G′) (θ : H => H′)
+    --   → ∀ A (x : ∣ F .F₀ (G .F₀ (H .F₀ A)) ∣) →
+    --   F′ .F₁ (λ (y : ∣ G .F₀ (H .F₀ A) ∣) → G′ .F₁ (θ .η A) (γ .η (H .F₀ A) y)) (φ .η (G .F₀ (H .F₀ A)) x)
+    --   ≡ (F′ F∘ G′) .F₁ (θ .η A) (F′ .F₁ (γ .η (H .F₀ A)) (φ .η (G .F₀ (H .F₀ A)) x))
+    -- lemma2 F F′ G G′ H H′ φ γ θ A x i = F′ .F-∘ (G′ .F₁ (θ .η A)) (γ .η (F₀ H A)) i (φ .η (F₀ G (F₀ H A)) x)
+    -- F′ (G′ θ ∘ γ) ∘ φ = F′ G′ θ ∘ F′ γ ∘ φ
+    -- PathP
+    --   (λ z → Functor.₀ (F∘-assoc z) A ⇾ Functor.₀ (F∘-assoc z) A)
+    --   (F₁ F∘-functor (φ , F₁ F∘-functor (ψ , θ)) .η A)
+    --   (F₁ F∘-functor (F₁ F∘-functor (φ , ψ) , θ) .η A)
+
+    -- ρ← ◂ G ∘ α← ≡ F ▸ λ←
+    -- F(1G) ↝ (F1)G ↝ FG ≡ F(1G) ↝ FG
+    -- the morally correct answer is that the action of 1 on objects and morphisms is the identity... in fact, since we've implemented both the identity and associator laws in terms of equalities, they should just be equal by composition of equalities.
+
+    -- so the plan is that we solve this, and then transport along id-iso or id-iso .to or whatever, and if that doesn't work, we try to use this to figure out how to apply the same reasoning at least.
+    lemma2 : ∀ {F G : Functor (Sets ℓ) (Sets ℓ)} →
+      F∘-assoc {F = Sets ℓ} {F = F} {G = Id {C = Sets ℓ}} {H = G} ∙ (ap₂ _F∘_ F∘-idr refl) ≡ ap₂ _F∘_ refl F∘-idl
+    lemma2 {F} {G} i j = {!!}
+
+    -- stuff that might be useful: uaβ and other stuff around there, Hom-transport (converts between path→iso and transport as an identity), Hom-pathp (as before but reversed)
+    -- lemma2 : ∀ x →
+    --   _◂_
+    --      (CM.to
+    --       (transport (isomorphism stuff) (id-iso C)
+    --        (Functor-path (λ _ → F∘-idr)
+    --         (λ φ →
+    --            Nat-pathp F∘-idr F∘-idr (Poly.F.lemma φ)))
+    --        )
+    --       .η F
+    --      .η A)
+    --      (CM.to
+    --       (path→iso
+    --        (Functor-path (λ z → F∘-assoc)
+    --         (λ (φ , (γ , ψ)) →
+    --            Nat-pathp F∘-assoc F∘-assoc
+    --            (Poly.F.lemma φ γ ψ))
+    --        )
+    --       .η (F , Id , G) .η A x))
+    --   ≡
+    --   _▸_
+    --    (CM.to
+    --    (path→iso
+    --     (Functor-path (λ _ → F∘-idl)
+    --      (λ z → Nat-pathp F∘-idl F∘-idl (λ _ → refl)))
+    --     )
+    --    .η G)
+    --   .η A
+    -- lemma2 = ?
+
+
+    postulate
+      nonsense : ⊥
+
+    ◃-monoidal : Monoidal-category Cat[ Sets ℓ , Sets ℓ ]
     ◃-monoidal .-⊗- = F∘-functor
     ◃-monoidal .Unit = Id
+
     ◃-monoidal .unitor-l =
       path→iso
         (Functor-path (λ _ → F∘-idl)
           (λ _ → Nat-pathp F∘-idl F∘-idl λ _ →  refl))
       ni⁻¹
+
     ◃-monoidal .unitor-r =
       path→iso
         (Functor-path (λ _ → F∘-idr)
-          λ φ → Nat-pathp F∘-idr F∘-idr λ A → {!!})
+          λ φ → Nat-pathp _ _ (lemma φ))
       ni⁻¹
-    ◃-monoidal .associator = absurd nonsense
-    ◃-monoidal .triangle = absurd nonsense
+      where
+        lemma : ∀ {F G} (φ : F => G) →
+          ∀ A → (φ ◆ id {Id}) .η A ≡ φ .η A
+        lemma {G = G} φ A i x = G .F-id {x = A} i (φ .η A x)
+
+    -- TODO: probably just go over the implicit arguments and see if an error occurs
+    ◃-monoidal .associator =
+      path→iso (
+        Functor-path (λ _ → F∘-assoc)
+        λ (φ , (γ , ψ)) → Nat-pathp F∘-assoc F∘-assoc (lemma φ γ ψ)
+      )
+      ni⁻¹
+      where
+        lemma : ∀ {F F′ G G′ H H′ : Functor (Sets ℓ) (Sets ℓ)} (φ : F => F′) (γ : G => G′) (ψ : H => H′)
+          → ∀ A → (φ ◆ (γ ◆ ψ)) .η A ≡ ((φ ◆ γ) ◆ ψ) .η A
+        lemma {F′ = F′} {G = G} {G′ = G′} {H = H} φ γ ψ A i x =
+          F′ .F-∘ {y = G′ .F₀ _} (G′ .F₁ (ψ .η _)) (γ .η _) i (φ .η _ x)
+
+    -- for this, we're trying to get rid of of the identity functor in the middle, I guess after reassociation, so I'm thinking it'll involve using one of the identity laws. What I'm confused by though is that because my associator and unitor definitions involve path→iso, that suggests I'm gonna need some transport identities, but I'm not sure how to introduce them into all this. I guess I'll try the usual method of coming up with something simpler to solve.
+    ◃-monoidal .triangle {A = F} {B = G} = absurd nonsense
+
     ◃-monoidal .pentagon = absurd nonsense
 
   𝟙 : Poly.Poly.Ob ℓ ℓ
